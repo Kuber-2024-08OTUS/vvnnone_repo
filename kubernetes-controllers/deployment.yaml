@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ribak-volodya
+  namespace: homework
+  labels:
+    app: homework-2
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: homework-2
+  strategy:
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        app: homework-2
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: homework
+                operator: In
+                values:
+                - "true"
+      volumes:
+      - name: shared-dir
+        emptyDir: {}
+      - name: nginx-config-volume
+        configMap:
+          name: nginx-config
+      containers:
+      - name: web-server
+        image: nginx:1.14.2
+        ports:
+        - containerPort: 8000
+        volumeMounts:
+        - mountPath: /homework
+          name: shared-dir
+        - mountPath: /etc/nginx/conf.d
+          name: nginx-config-volume
+        readinessProbe:
+          exec:
+            command:
+              - cat
+              - /homework/index.html
+          initialDelaySeconds: 3
+          periodSeconds: 3
+          failureThreshold: 3
+        lifecycle:
+          preStop:
+            exec:
+              command: ['sh', 'c', 'rm -f /homework/index.html']
+      initContainers:
+      - name: download-index
+        image: busybox:1.28
+        command: ['sh', '-c', 'wget http://example.com/ -P /init']
+        volumeMounts:
+          - mountPath: /init
+            name: shared-dir
+    
